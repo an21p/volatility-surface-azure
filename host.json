@@ -1,6 +1,15 @@
 {
   "version": "2.0",
   "logging": {
+    "fileLoggingMode": "debugOnly",
+
+    "logLevel": {
+      "default": "Information",
+      "Host.Results": "Information",
+      "Host.Aggregator": "Trace",
+      "Function.DownloadTrigger": "Debug"
+    },
+
     "applicationInsights": {
       "samplingSettings": {
         "isEnabled": true,

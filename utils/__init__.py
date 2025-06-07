@@ -1,9 +1,26 @@
 
+from io import StringIO
 from azure.storage.blob import BlobServiceClient
 
-import logging
-import requests
+from logging import debug
+from requests import get
+from calendar import monthcalendar
+
 import pandas as pd
+
+
+def is_third_friday(dt: pd.Timestamp) -> bool:
+    if dt.weekday() != 4:
+        return False
+    # Build all Fridays in that month via calendar.monthcalendar
+    year, month = dt.year, dt.month
+    month_cal = monthcalendar(year, month)
+    fridays = [week[4]
+               # collect nonzero Fridays
+               for week in month_cal if week[4] != 0]
+    # third Friday is index 2
+    return len(fridays) >= 3 and dt.day == fridays[2]
+
 
 def parse_option_codes(df):
     """
@@ -40,9 +57,9 @@ def fetch(ticker: str) -> pd.DataFrame:
     """
     Fetches options data for the given ticker.
     """
-    
+
     url = f"https://cdn.cboe.com/api/global/delayed_quotes/options/{ticker.upper()}.json"
-    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    resp = get(url, headers={"User-Agent": "Mozilla/5.0"})
     resp.raise_for_status()
     data = resp.json()['data']
 
@@ -52,6 +69,7 @@ def fetch(ticker: str) -> pd.DataFrame:
     df['spot'] = current_price
 
     return df
+
 
 def setup_blob_container(conn_str: str, container_name: str):
     """
@@ -63,8 +81,9 @@ def setup_blob_container(conn_str: str, container_name: str):
     try:
         container_client.create_container()
     except Exception as e:
-        logging.debug(f"Container already exists or failed to create: {e}")
+        debug(f"Container already exists or failed to create: {e}")
     return container_client
+
 
 def blob_exists(container_client, blob_name: str) -> bool:
     """
@@ -75,3 +94,12 @@ def blob_exists(container_client, blob_name: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def data_frame_from_blob(container_client, blob_name: str) -> pd.DataFrame:
+    blob_data = container_client.get_blob_client(
+        blob_name).download_blob().readall()
+    df = pd.read_csv(StringIO(blob_data.decode('utf-8')))
+    df['expiry'] = pd.to_datetime(df['expiry'])
+    df['strike'] = df['strike'].astype(float)
+    return df
