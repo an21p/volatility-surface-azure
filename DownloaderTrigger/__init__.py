@@ -87,6 +87,7 @@ def download_and_upload_raw_options(ticker: str, container_client) -> Optional[p
             info(f"Uploaded blob: {raw_blob_name}")
             info(
                 f"Successfully fetched and stored options data for {ticker}.")
+            return df
         else:
             info('No Datasets have been updated in the last two weeks')
     except Exception as e:
