@@ -4,7 +4,7 @@ from os import getenv
 from logging import info, warning, error
 from typing import Optional
 from datetime import datetime, timezone
-from utils import fetch, setup_blob_container, blob_exists, is_third_friday, data_frame_from_blob
+from DownloaderTrigger.utils import fetch, setup_blob_container, blob_exists, is_third_friday, data_frame_from_blob
 
 import pandas as pd
 
