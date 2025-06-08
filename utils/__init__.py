@@ -114,11 +114,8 @@ def blob_exists(container_client, blob_name: str) -> bool:
 
 
 def data_frame_from_blob(container_client, blob_name: str) -> pd.DataFrame:
-    blob_data = container_client.get_blob_client(
-        blob_name).download_blob().readall()
+    blob_data = container_client.get_blob_client(blob_name).download_blob().readall()
     df = pd.read_csv(StringIO(blob_data.decode('utf-8')))
-    df['expiry'] = pd.to_datetime(df['expiry'])
-    df['strike'] = df['strike'].astype(float)
     return df
 
 
@@ -188,7 +185,11 @@ def download_and_upload_raw_options(ticker: str, container_client) -> Optional[p
 
     if blob_exists(container_client, raw_blob_name):
         info(f"Blob {raw_blob_name} already exists. Skipping upload.")
-        return data_frame_from_blob(container_client, raw_blob_name)
+        df = data_frame_from_blob(container_client, raw_blob_name)
+        df['expiry'] = pd.to_datetime(df['expiry'])
+        df['strike'] = df['strike'].astype(float)
+        df['spot'] = df['strike'].astype(float)
+        return df
 
     info(f"Fetching options data for {ticker}...")
     try:

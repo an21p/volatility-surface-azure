@@ -22,6 +22,8 @@ def get_option_data(ticker: str, date: datetime) -> Optional[pd.DataFrame]:
         df = utils.data_frame_from_blob(container_client, filtered_blob_name)
         df['ask'] = df['ask'].astype(float)
         df['bid'] = df['bid'].astype(float)
+        df['spot'] = df['strike'].astype(float)
+        df['strike'] = df['strike'].astype(float)
         logging.info(
             f"option_data: Data for {ticker} on {date} {df.head()}")
         return df

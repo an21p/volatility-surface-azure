@@ -8,6 +8,7 @@ This project provides an Azure Functions-based backend for fetching, filtering, 
 - **Data Filtering:** Processes raw options data to extract near-the-money call options for the next standard (third Friday) expiry.
 - **HTTP API:** Exposes an HTTP-triggered endpoint to retrieve filtered options data for a given ticker and date, suitable for building volatility surfaces.
 - **Azure Blob Storage:** Stores both raw and filtered options data in Azure Blob Storage for efficient access and persistence.
+- **Visualisation:** Includes a script to fetch filtered data and plot the implied volatility surface using QuantLib and matplotlib.
 
 ## Usage
 
@@ -20,6 +21,7 @@ This project provides an Azure Functions-based backend for fetching, filtering, 
 - `function_app.py`: Registers all Azure Functions.
 - `downloader_trigger/`: Timer-triggered function for scheduled data download.
 - `option_data/`: HTTP-triggered function for serving filtered options data.
+- `visualiser/`: Script for fetching data and plotting the volatility surface.
 - `utils/`: Shared utilities for data fetching, filtering, and storage.
 
 ## Requirements
@@ -35,4 +37,6 @@ See [requirements.txt](requirements.txt) for Python dependencies.
 
 ```bash
 func start
+
+python visualiser/__init__.py --ticker TSLA
 ```
