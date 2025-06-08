@@ -2,7 +2,6 @@ import azure.functions as func
 import logging
 import utils
 import pandas as pd
-import QuantLib as ql
 
 from datetime import datetime
 from typing import Optional
@@ -10,7 +9,7 @@ from typing import Optional
 volatility_surface = func.Blueprint()
 
 
-def build_surface(ticker: str, date: datetime) -> Optional[pd.DataFrame]:
+def get_option_data(ticker: str, date: datetime) -> Optional[pd.DataFrame]:
     """
     Placeholder function to build the volatility surface.
     This function should contain the logic to fetch and process
@@ -69,7 +68,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             )
 
     try:
-        surface = build_surface(ticker, date)
+        option_data = get_option_data(ticker, date)
     except Exception:
         logging.error(
             f"volatility_surface: Error building surface for {ticker} on {date}")
@@ -79,12 +78,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     logging.info('volatility_surface: returning')
-    if surface is None or surface.empty:
+    if option_data is None or option_data.empty:
         logging.error(
             f"volatility_surface: No data available for {ticker} on {date}")
         return func.HttpResponse(
             "No data available for the specified ticker and date.",
             status_code=404
         )
-    json_output = surface.to_json(orient="records")
+    json_output = option_data.to_json(orient="records")
     return func.HttpResponse(json_output, mimetype="application/json")
