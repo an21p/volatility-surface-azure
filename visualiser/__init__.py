@@ -5,7 +5,6 @@ import numpy as np
 import QuantLib as ql
 from datetime import date
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # Ensure 3D plotting is enabled
 
 def implied_vol_mid(option, bid, ask, bsm_process, tol=1e-6, max_eval=100, vol_min=1e-4, vol_max=5.0):
     """
@@ -31,21 +30,15 @@ def implied_vol_mid(option, bid, ask, bsm_process, tol=1e-6, max_eval=100, vol_m
         return vol
     except RuntimeError:
         return None
-
-
-def run(ticker: str = "SPY") -> None:
+    
+def build_surface(data: pd.DataFrame, ticker: str = "SPY") -> tuple:
     n_points = 50
 
-    data = requests.get(f"https://volsurface.azurewebsites.net/api/option-data?ticker={ticker}")
-    #data = requests.get(f"http://localhost:7071/api/option-data?ticker={ticker}")
-    data = pd.DataFrame(data.json())
     data['expiry'] = pd.to_datetime(data['expiry'])
     data['spot'] = data['spot'].astype(float)
     data['strike'] = data['strike'].astype(float)
     data['ask'] = data['ask'].astype(float)
     data['bid'] = data['bid'].astype(float)
-
-
 
     # Choose evaluation date
     today_py = date.today()
@@ -158,6 +151,17 @@ def run(ticker: str = "SPY") -> None:
         for j, k in enumerate(unique_strikes):
             vol_surface[i, j] = black_var_handle.blackVol(t, k)
 
+    return unique_strikes, expiry_periods, vol_surface
+
+
+def run(ticker: str = "SPY") -> None:
+    data = requests.get(f"https://volsurface.azurewebsites.net/api/option-data?ticker={ticker}")
+    #data = requests.get(f"http://localhost:7071/api/option-data?ticker={ticker}")
+    if data.status_code != 200:
+        raise Exception(f"Failed to fetch data for {ticker}: {data.text}")
+    
+    unique_strikes, expiry_periods, vol_surface = build_surface(pd.DataFrame(data.json()), ticker)
+
     # Select a few expiries to visualize
     X, Y = np.meshgrid(unique_strikes, expiry_periods)
     fig = plt.figure(figsize=(10, 7))
@@ -169,7 +173,6 @@ def run(ticker: str = "SPY") -> None:
     ax.set_title(f'{ticker} Implied Volatility Surface')
     ax.view_init(elev=20, azim=-30, roll=2) # type: ignore
     plt.show()
-
 
 def main():
 
