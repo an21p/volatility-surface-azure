@@ -81,6 +81,7 @@ def get_data(req: func.HttpRequest) -> func.HttpResponse:
 
 renderer = func.Blueprint()
 
+
 @renderer.function_name(name="RendererTrigger")
 @renderer.route(route="volatility-surface", auth_level=func.AuthLevel.ANONYMOUS)
 def render(req: func.HttpRequest) -> func.HttpResponse:
@@ -113,7 +114,8 @@ def render(req: func.HttpRequest) -> func.HttpResponse:
     unique_strikes, expiry_periods, vol_surface = build_surface(df, ticker)
 
     X, Y = np.meshgrid(unique_strikes, expiry_periods)
-    fig = go.Figure(data=[go.Surface(x=X, y=Y, z=vol_surface, colorscale='Viridis')])
+    fig = go.Figure(
+        data=[go.Surface(x=X, y=Y, z=vol_surface, colorscale='Viridis')])
     fig.update_layout(
         scene=dict(
             xaxis_title='Strike',
@@ -121,7 +123,7 @@ def render(req: func.HttpRequest) -> func.HttpResponse:
             zaxis_title='Implied Volatility',
             camera=dict(
                 eye=dict(x=1.575, y=-1.564, z=0.410),
-                up=dict(x=0, y=0, z=10) 
+                up=dict(x=0, y=0, z=10)
             )
         ),
         title=f'{ticker} Implied Volatility Surface'

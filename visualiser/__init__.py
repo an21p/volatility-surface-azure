@@ -6,6 +6,7 @@ import QuantLib as ql
 from datetime import date
 import matplotlib.pyplot as plt
 
+
 def implied_vol_mid(option, bid, ask, bsm_process, tol=1e-6, max_eval=100, vol_min=1e-4, vol_max=5.0):
     """
     Calculate implied volatility from the mid price of bid and ask quotes for a given QuantLib option.
@@ -30,7 +31,8 @@ def implied_vol_mid(option, bid, ask, bsm_process, tol=1e-6, max_eval=100, vol_m
         return vol
     except RuntimeError:
         return None
-    
+
+
 def build_surface(data: pd.DataFrame, ticker: str = "SPY") -> tuple:
     n_points = 50
 
@@ -155,24 +157,28 @@ def build_surface(data: pd.DataFrame, ticker: str = "SPY") -> tuple:
 
 
 def run(ticker: str = "SPY") -> None:
-    data = requests.get(f"https://volsurface.azurewebsites.net/api/option-data?ticker={ticker}")
-    #data = requests.get(f"http://localhost:7071/api/option-data?ticker={ticker}")
+    data = requests.get(
+        f"https://volsurface.azurewebsites.net/api/option-data?ticker={ticker}")
+    # data = requests.get(f"http://localhost:7071/api/option-data?ticker={ticker}")
     if data.status_code != 200:
         raise Exception(f"Failed to fetch data for {ticker}: {data.text}")
-    
-    unique_strikes, expiry_periods, vol_surface = build_surface(pd.DataFrame(data.json()), ticker)
+
+    unique_strikes, expiry_periods, vol_surface = build_surface(
+        pd.DataFrame(data.json()), ticker)
 
     # Select a few expiries to visualize
     X, Y = np.meshgrid(unique_strikes, expiry_periods)
     fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(X, Y, vol_surface, cmap='viridis', edgecolor='none')  # type: ignore
+    ax.plot_surface(X, Y, vol_surface, cmap='viridis',
+                    edgecolor='none')  # type: ignore
     ax.set_xlabel('Strike')
     ax.set_ylabel('Expiry (years)')
     ax.set_zlabel('Implied Volatility')  # type: ignore
     ax.set_title(f'{ticker} Implied Volatility Surface')
-    ax.view_init(elev=20, azim=-30, roll=2) # type: ignore
+    ax.view_init(elev=20, azim=-30, roll=2)  # type: ignore
     plt.show()
+
 
 def main():
 
