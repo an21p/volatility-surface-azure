@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 
-volatility_surface = func.Blueprint()
+option_data = func.Blueprint()
 
 
 def get_option_data(ticker: str, date: datetime) -> Optional[pd.DataFrame]:
@@ -23,35 +23,35 @@ def get_option_data(ticker: str, date: datetime) -> Optional[pd.DataFrame]:
         df['ask'] = df['ask'].astype(float)
         df['bid'] = df['bid'].astype(float)
         logging.info(
-            f"volatility_surface: Data for {ticker} on {date} {df.head()}")
+            f"option_data: Data for {ticker} on {date} {df.head()}")
         return df
     else:
         logging.info(
-            f"volatility_surface: Downloading missung data for {ticker} on {date}")
+            f"option_data: Downloading missung data for {ticker} on {date}")
         raw_options = utils.download_and_upload_raw_options(
             ticker, container_client)
         filtered_options = utils.upload_filtered_options(ticker, container_client,
                                                          raw_options, filtered_blob_name)
         if filtered_options is None or filtered_options.empty:
             logging.error(
-                f"volatility_surface: No filtered options data for {ticker} on {date}")
+                f"option_data: No filtered options data for {ticker} on {date}")
             raise Exception(f"No filtered options data for {ticker} on {date}")
 
         logging.info(
-            f"volatility_surface: Data for {ticker} on {date} {filtered_options.head()}")
+            f"option_data: Data for {ticker} on {date} {filtered_options.head()}")
         return filtered_options
 
 
-@volatility_surface.function_name(name="VolatilitySurfaceTrigger")
-@volatility_surface.route(route="volatility-surface", auth_level=func.AuthLevel.ANONYMOUS)
+@option_data.function_name(name="OptionDataTrigger")
+@option_data.route(route="option-data", auth_level=func.AuthLevel.ANONYMOUS)
 def main(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('volatility_surface: start')
+    logging.info('option_data: start')
 
     ticker = req.params.get('ticker')
     if not ticker:
         ticker = "SPY"
     ticker = ticker.strip().upper()
-    logging.info(f'volatility_surface: ticker {ticker}')
+    logging.info(f'option_data: ticker {ticker}')
 
     date = req.params.get('date')
     if not date:
@@ -71,16 +71,16 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         option_data = get_option_data(ticker, date)
     except Exception:
         logging.error(
-            f"volatility_surface: Error building surface for {ticker} on {date}")
+            f"option_data: Error building surface for {ticker} on {date}")
         return func.HttpResponse(
             "Something went wrong while building the volatility surface.",
             status_code=500
         )
 
-    logging.info('volatility_surface: returning')
+    logging.info('option_data: returning')
     if option_data is None or option_data.empty:
         logging.error(
-            f"volatility_surface: No data available for {ticker} on {date}")
+            f"option_data: No data available for {ticker} on {date}")
         return func.HttpResponse(
             "No data available for the specified ticker and date.",
             status_code=404

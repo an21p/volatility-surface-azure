@@ -19,7 +19,7 @@ This project provides an Azure Functions-based backend for fetching, filtering, 
 
 - `function_app.py`: Registers all Azure Functions.
 - `downloader_trigger/`: Timer-triggered function for scheduled data download.
-- `volatility_surface/`: HTTP-triggered function for serving filtered options data.
+- `option_data/`: HTTP-triggered function for serving filtered options data.
 - `utils/`: Shared utilities for data fetching, filtering, and storage.
 
 ## Requirements
