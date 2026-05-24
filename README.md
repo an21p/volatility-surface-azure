@@ -29,6 +29,50 @@ Base URL (production): `https://volsurface.azurewebsites.net`
 
 Both accept `ticker` (default `SPY`) and `date` (`YYYY-MM-DD`, default today).
 
+## Understanding the surface
+
+An **implied volatility surface** is the market's view of risk for one
+underlying, read off option prices. Every option price implies a single
+volatility number — the value that makes a Black–Scholes model reproduce the
+quoted price. Plot that number across all strikes and expiries and you get a
+surface, not a flat sheet, which is exactly the interesting part.
+
+The page plots three axes:
+
+- **Strike (x)** — the option's exercise price. Lower strikes (left) are
+  downside puts; higher strikes (right) are upside calls.
+- **Tenor (y)** — time to expiry, in years.
+- **Implied volatility (z)** — annualised, in %. Encoded by both height and
+  colour: cool indigo = calm (low IV), warm amber = stressed (high IV).
+
+Two things to read off the shape:
+
+- **Skew / smile (across strike).** A textbook-flat market would be level; in
+  practice IV rises toward low strikes (downside puts are bid up for crash
+  protection) and often curls up at both wings (the "smile"). The **Skew ·
+  90/110** stat quantifies it as IV(90% strike) − IV(110% strike) in vol points
+  — positive is the classic equity put skew.
+- **Term structure (across tenor).** How IV changes with time to expiry. The
+  **Term · F→B** stat is back-month minus front-month ATM IV: positive
+  (contango) is the calm default; negative (backwardation) flags near-term
+  stress.
+
+### How it's built
+
+1. For each near-the-money option, solve the **implied volatility** from the
+   bid/ask **mid** price with a Black–Scholes–Merton model (QuantLib), assuming
+   flat `r = 3%` and `q = 1%`.
+2. Fit those points into a QuantLib **`BlackVarianceSurface`**, filling gaps and
+   interpolating.
+3. Sample it on a fine grid of strikes × tenors to draw.
+
+The readout panel summarises the surface: **Spot**, **ATM IV** (at-the-money,
+~1-month), **Skew**, **Term**, the **IV range** (min–max across the grid), the
+**tenor span**, and the number of **strikes**.
+
+> Figures are model-derived from delayed CBOE data with flat rate/dividend
+> assumptions — illustrative, not trading-grade marks.
+
 ## Structure
 
 - `function_app.py` — registers all Azure Functions.
@@ -90,12 +134,30 @@ The production app is an **Azure Functions Flex Consumption** app:
 | Plan | Flex Consumption (Linux, Python 3.12) |
 | URL | `https://volsurface.azurewebsites.net` |
 
-Deploys are **manual** (no CI/CD). Flex Consumption builds dependencies
-remotely, so deploy with Core Tools and `--build remote`:
+### Automatic (CI/CD)
+
+Pushing to `main` triggers [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml),
+which deploys to the function app via `azure/login` + `Azure/functions-action`
+(Flex Consumption, remote build). Docs-only changes (`**.md`) are skipped. Auth
+uses a service principal stored in the `AZURE_CREDENTIALS` repository secret,
+scoped to **only** the `volsurface` function app.
+
+To (re)create that service principal and secret:
+
+```bash
+az ad sp create-for-rbac --name "gh-volsurface-deploy" --role contributor \
+  --scopes "/subscriptions/<SUB_ID>/resourceGroups/volsurface/providers/Microsoft.Web/sites/volsurface" \
+  --sdk-auth | gh secret set AZURE_CREDENTIALS --repo an21p/volatility-surface-azure
+```
+
+### Manual (fallback)
+
+Flex Consumption builds dependencies remotely, so deploy with Core Tools and
+`--build remote`:
 
 ```bash
 az login                                       # account needs Contributor on the app
-func azure functionapp publish volsurface --build remote
+func azure functionapp publish volsurface --build remote --python
 ```
 
 App settings (storage connection strings, App Insights) are configured on the
@@ -103,10 +165,10 @@ app and are **not** stored in this repo.
 
 ### Notes / gotchas
 
-- **Flex Consumption is required-RBAC for tooling.** It does **not** support the
+- **Flex Consumption requires RBAC for tooling.** It does **not** support the
   classic `az functionapp deployment source config-zip`, nor a publish-profile
   based GitHub Action — `Azure/functions-action` on Flex needs an `azure/login`
-  (service principal / OIDC) step. CI/CD was intentionally skipped because the
-  available account lacks rights to create the required identity.
+  (service principal / OIDC) step, which is why CI/CD uses `AZURE_CREDENTIALS`.
+- `func ... publish` needs `--python` when there is no `local.settings.json`.
 - The `scripts/` preview tooling and `.preview-venv/` are excluded from the
   deployment package via `.funcignore` and `.gitignore`.

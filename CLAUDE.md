@@ -33,24 +33,32 @@ uv venv .preview-venv && uv pip install --python .preview-venv/bin/python plotly
 .preview-venv/bin/python scripts/serve_preview.py --port 8050   # http://localhost:8050
 ```
 
-## Deployment (manual)
+## Deployment
 
 Production app: **`volsurface`** / RG `volsurface` / subscription `AzureCyan` /
 **Flex Consumption**, Linux, Python 3.12 → <https://volsurface.azurewebsites.net>
 
+**Automatic:** pushing to `main` runs `.github/workflows/deploy.yml`, which
+deploys via `azure/login` + `Azure/functions-action` (remote build). Auth is a
+service principal in the `AZURE_CREDENTIALS` secret, scoped to the function app.
+Docs-only (`**.md`) pushes are skipped.
+
+**Manual** (fallback / pre-push build check):
+
 ```bash
 az login                                       # needs Contributor on the app
-func azure functionapp publish volsurface --build remote
+func azure functionapp publish volsurface --build remote --python
 ```
 
 ### Important constraints
 
 - **Flex Consumption.** Remote build is required (`--build remote`). The classic
-  `az functionapp deployment source config-zip` is **not** supported.
-- **No CI/CD.** A publish-profile GitHub Action does **not** work on Flex —
-  `Azure/functions-action` needs an `azure/login` (service principal / OIDC)
-  step. Auto-deploy was intentionally skipped: creating that identity needs IAM
-  rights the available (guest) account lacks. If revisiting CI/CD, set up an SP
-  or OIDC federated credential and add an `azure/login` step before the action.
+  `az functionapp deployment source config-zip` is **not** supported, and a
+  publish-profile GitHub Action does **not** work — `Azure/functions-action`
+  needs an `azure/login` (service principal / OIDC) step.
+- `func ... publish` needs `--python` when there's no `local.settings.json`.
+- Re-create the deploy SP: `az ad sp create-for-rbac --name gh-volsurface-deploy
+  --role contributor --scopes <function-app-resource-id> --sdk-auth | gh secret
+  set AZURE_CREDENTIALS --repo an21p/volatility-surface-azure`.
 - Adding a dependency means editing `requirements.txt`; Flex installs it during
   the remote build on the next deploy.
