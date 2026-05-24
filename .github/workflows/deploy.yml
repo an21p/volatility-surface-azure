@@ -1,0 +1,42 @@
+name: Deploy to Azure Functions
+
+# Auto-deploy the volatility-surface app to the Flex Consumption function app
+# on every push to main. Auth uses the app's publish profile, stored as the
+# AZURE_FUNCTIONAPP_PUBLISH_PROFILE repository secret.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_NAME: volsurface
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
+  PYTHON_VERSION: '3.12'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Deploy to Azure Functions (Flex Consumption)
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+          sku: flexconsumption
+          remote-build: true
