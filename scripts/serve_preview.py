@@ -54,8 +54,27 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if parsed.path not in ("/", "/api/volatility-surface", "/volatility-surface"):
+        if parsed.path not in ("/", "/api/volatility-surface", "/volatility-surface",
+                                "/api/surface-analysis"):
             self.send_error(404, "Not found")
+            return
+
+        if parsed.path == "/api/surface-analysis":
+            import json as _json
+            qs = parse_qs(parsed.query)
+            tk = qs.get("ticker", ["SPY"])[0].upper()
+            body = _json.dumps({
+                "analysis": (f"{tk} shows an at-the-money implied vol around 37%, "
+                             "with a clear downside skew and a gently upward term "
+                             "structure. The wings lift toward both low and high "
+                             "strikes, a typical equity smile. (preview stub)"),
+                "cached": False,
+            }).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         qs = parse_qs(parsed.query)
