@@ -445,7 +445,7 @@ $ticker_options
           <span class="v $term_cls"><span class="num" data-to="$term" data-dp="1" data-sign="1">0</span><span class="u">pts</span></span></div>
         <div class="stat wide"><span class="k">IV Range</span>
           <span class="v"><span class="num" data-to="$iv_lo" data-dp="1">0</span><span class="u">%</span>
-            <span class="u" style="padding:0 4px">—</span>
+            <span class="u" style="padding:0 5px">to</span>
             <span class="num" data-to="$iv_hi" data-dp="1">0</span><span class="u">%</span></span></div>
         <div class="stat"><span class="k">Tenor span</span>
           <span class="v"><span class="num" data-to="$tenor_span" data-dp="2">0</span><span class="u">y</span></span></div>
@@ -454,7 +454,7 @@ $ticker_options
       </div>
 
       <p class="note rise" style="--d:.26s">Vols solved from bid/ask mid via a
-        <b>Black–Scholes–Merton</b> model, then fitted to a <b>Black-variance
+        <b>Black-Scholes-Merton</b> model, then fitted to a <b>Black-variance
         surface</b>. Flat assumptions: <b>r&nbsp;3%</b>, <b>q&nbsp;1%</b>.
         Grid resolved to <b>$n_nodes</b> nodes.</p>
     </aside>
@@ -487,7 +487,7 @@ $ticker_options
       <span class="eyebrow">Methodology</span>
       <h2>Reading the volatility surface</h2>
       <p class="lead">An implied volatility surface is the options market's map
-        of risk for a single underlying — one volatility number for every strike
+        of risk for a single underlying: one volatility number for every strike
         and expiry, drawn as a landscape rather than a single line. Its shape
         encodes how the market prices uncertainty across price and time.</p>
     </div>
@@ -497,7 +497,7 @@ $ticker_options
         <h3>Strike, tenor, volatility</h3>
         <p><b>Strike</b> (x) is the option's exercise price; <b>tenor</b> (y) is
           time to expiry in years; <b>height &amp; colour</b> (z) are annualised
-          implied volatility — cool indigo is calm, warm amber is stressed. The
+          implied volatility: cool indigo is calm, warm amber is stressed. The
           tilt across strikes is the <b>skew / smile</b>; the slope across
           tenors is the <b>term structure</b>.</p>
       </article>
@@ -505,7 +505,7 @@ $ticker_options
         <span class="num-tag">02 · How it's built</span>
         <h3>From quotes to a surface</h3>
         <p>For each near-the-money option we invert the <b>bid/ask mid</b> price
-          through a Black–Scholes–Merton model (QuantLib) to recover its implied
+          through a Black-Scholes-Merton model (QuantLib) to recover its implied
           vol, assuming flat <b>r&nbsp;3%</b> and <b>q&nbsp;1%</b>. Those points
           are fitted into a QuantLib <b>Black-variance surface</b>, then sampled
           on a fine strike&nbsp;×&nbsp;tenor grid.</p>
@@ -520,7 +520,7 @@ $ticker_options
       </article>
     </div>
     <p class="method-foot">Figures are model-derived from delayed CBOE quotes
-      with flat rate and dividend assumptions — illustrative, not
+      with flat rate and dividend assumptions, so they are illustrative, not
       trading-grade marks.</p>
   </section>
 
