@@ -35,3 +35,41 @@ def test_build_prompt_structure():
     assert payload["ticker"] == "TSLA"
     assert payload["atm_iv_pct"] == 37.0
     assert payload["coarse_iv_grid"]["strikes"] == [200, 242, 284]
+
+
+from unittest.mock import MagicMock
+
+
+def _fake_response(status=200, content="ok"):
+    r = MagicMock()
+    r.status_code = status
+    r.json.return_value = {"choices": [{"message": {"content": content}}]}
+    r.text = content
+    return r
+
+
+def test_call_openai_missing_key(monkeypatch):
+    monkeypatch.delenv("OPEN_AI_API", raising=False)
+    assert analysis._call_openai([{"role": "user", "content": "hi"}]) is None
+
+
+def test_call_openai_success_strips_dashes(monkeypatch):
+    monkeypatch.setenv("OPEN_AI_API", "sk-test")
+    monkeypatch.setattr(analysis.requests, "post",
+                        lambda *a, **k: _fake_response(200, "Vol is high — skew steep. "))
+    out = analysis._call_openai([{"role": "user", "content": "hi"}])
+    assert out == "Vol is high - skew steep."   # trimmed + em-dash converted
+
+
+def test_call_openai_non_200(monkeypatch):
+    monkeypatch.setenv("OPEN_AI_API", "sk-test")
+    monkeypatch.setattr(analysis.requests, "post", lambda *a, **k: _fake_response(500, "boom"))
+    assert analysis._call_openai([{"role": "user", "content": "hi"}]) is None
+
+
+def test_call_openai_exception(monkeypatch):
+    monkeypatch.setenv("OPEN_AI_API", "sk-test")
+    def boom(*a, **k):
+        raise RuntimeError("network")
+    monkeypatch.setattr(analysis.requests, "post", boom)
+    assert analysis._call_openai([{"role": "user", "content": "hi"}]) is None

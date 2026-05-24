@@ -65,3 +65,32 @@ def build_prompt(ticker: str, date_str: str, stats: dict, grid: dict) -> list:
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": json.dumps(payload)},
     ]
+
+
+def _call_openai(messages, timeout: int = 15) -> Optional[str]:
+    key = os.environ.get("OPEN_AI_API")
+    if not key:
+        warning("analysis: OPEN_AI_API not set; skipping analysis")
+        return None
+    try:
+        resp = requests.post(
+            OPENAI_URL,
+            headers={"Authorization": f"Bearer {key}",
+                     "Content-Type": "application/json"},
+            json={"model": MODEL, "messages": messages,
+                  "max_tokens": 160, "temperature": 0.4},
+            timeout=timeout,
+        )
+        if resp.status_code != 200:
+            warning(f"analysis: OpenAI {resp.status_code}: {resp.text[:200]}")
+            return None
+        text = resp.json()["choices"][0]["message"]["content"].strip()
+        return text.translate(_DASHES) or None
+    except Exception as e:  # noqa: BLE001 - never break the page on analysis
+        warning(f"analysis: OpenAI call failed: {e}")
+        return None
+
+
+def analyse_surface(ticker: str, date_str: str, stats: dict, grid: dict) -> Optional[str]:
+    """Build the prompt and return the model's text, or None on any failure."""
+    return _call_openai(build_prompt(ticker, date_str, stats, grid))
