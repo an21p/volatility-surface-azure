@@ -300,7 +300,7 @@ main{flex:1;display:grid;grid-template-columns:minmax(290px,360px) 1fr;
 .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;
   color:var(--gold);display:flex;align-items:center;gap:8px}
 .tag::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--gold);
-  box-shadow:0 0 12px var(--gold);animation:pulse 2.6s ease-in-out infinite}
+  box-shadow:0 0 12px var(--gold)}
 .ticker{font-family:var(--serif);font-weight:380;font-size:clamp(58px,8.6vw,108px);
   line-height:.86;letter-spacing:-.02em;margin:14px 0 0;color:var(--text);
   position:relative;display:inline-block}
@@ -362,9 +362,26 @@ footer{display:flex;justify-content:space-between;align-items:center;gap:16px;fl
 footer a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line)}
 footer a:hover{color:var(--gold);border-color:var(--gold)}
 
+.method{border-top:1px solid var(--line);padding-top:clamp(30px,4vw,54px);
+  display:flex;flex-direction:column;gap:clamp(24px,3vw,36px)}
+.method-head{max-width:720px}
+.method-head .eyebrow{color:var(--gold)}
+.method-head h2{font-family:var(--serif);font-weight:380;letter-spacing:-.01em;
+  font-size:clamp(28px,4vw,44px);line-height:1.05;margin:14px 0 0}
+.method-head .lead{font-size:16px;color:var(--muted);margin-top:16px;line-height:1.62}
+.method-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.method-grid article{background:var(--ink-2);padding:26px 24px;display:flex;flex-direction:column;gap:12px}
+.method-grid article:hover{background:var(--ink-3)}
+.num-tag{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+.method-grid h3{font-family:var(--serif);font-weight:400;font-size:20px;color:var(--text);line-height:1.15}
+.method-grid p{font-size:13.5px;color:var(--muted);line-height:1.64}
+.method-grid b{color:var(--text);font-weight:600}
+.method-foot{font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--dim);
+  line-height:1.6;border-left:2px solid var(--line);padding-left:14px;max-width:720px}
+
 @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 @keyframes draw{to{transform:scaleX(1)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .rise{opacity:0;animation:rise .8s cubic-bezier(.2,.8,.2,1) forwards}
 $delays
 @media (prefers-reduced-motion:reduce){
@@ -372,6 +389,7 @@ $delays
 }
 @media (max-width:920px){
   main{grid-template-columns:1fr}
+  .method-grid{grid-template-columns:1fr}
   .panel{min-height:460px}
   header{flex-direction:column}
 }
@@ -411,7 +429,7 @@ $ticker_options
   <main>
     <aside class="rail">
       <div class="ticker-block rise" style="--d:.10s">
-        <div class="tag">Live surface · $date</div>
+        <div class="tag">As of · $date</div>
         <h1 class="ticker">$ticker</h1>
         <p class="subtitle">Implied volatility across strike &amp; tenor.</p>
       </div>
@@ -464,7 +482,49 @@ $ticker_options
     </section>
   </main>
 
-  <footer class="rise" style="--d:.34s">
+  <section class="method rise" style="--d:.40s">
+    <div class="method-head">
+      <span class="eyebrow">Methodology</span>
+      <h2>Reading the volatility surface</h2>
+      <p class="lead">An implied volatility surface is the options market's map
+        of risk for a single underlying — one volatility number for every strike
+        and expiry, drawn as a landscape rather than a single line. Its shape
+        encodes how the market prices uncertainty across price and time.</p>
+    </div>
+    <div class="method-grid">
+      <article>
+        <span class="num-tag">01 · What the axes show</span>
+        <h3>Strike, tenor, volatility</h3>
+        <p><b>Strike</b> (x) is the option's exercise price; <b>tenor</b> (y) is
+          time to expiry in years; <b>height &amp; colour</b> (z) are annualised
+          implied volatility — cool indigo is calm, warm amber is stressed. The
+          tilt across strikes is the <b>skew / smile</b>; the slope across
+          tenors is the <b>term structure</b>.</p>
+      </article>
+      <article>
+        <span class="num-tag">02 · How it's built</span>
+        <h3>From quotes to a surface</h3>
+        <p>For each near-the-money option we invert the <b>bid/ask mid</b> price
+          through a Black–Scholes–Merton model (QuantLib) to recover its implied
+          vol, assuming flat <b>r&nbsp;3%</b> and <b>q&nbsp;1%</b>. Those points
+          are fitted into a QuantLib <b>Black-variance surface</b>, then sampled
+          on a fine strike&nbsp;×&nbsp;tenor grid.</p>
+      </article>
+      <article>
+        <span class="num-tag">03 · What it's useful for</span>
+        <h3>Pricing, risk &amp; relative value</h3>
+        <p>Price and hedge options consistently across the whole chain, spot
+          <b>rich / cheap</b> strikes and expiries, gauge how the market prices
+          crash risk via the <b>put skew</b>, and read its expectation of
+          near- versus long-term turbulence from the <b>term structure</b>.</p>
+      </article>
+    </div>
+    <p class="method-foot">Figures are model-derived from delayed CBOE quotes
+      with flat rate and dividend assumptions — illustrative, not
+      trading-grade marks.</p>
+  </section>
+
+  <footer class="rise" style="--d:.46s">
     <span>Source · CBOE delayed options · rendered $date</span>
     <span>Azure Functions · <a href="https://github.com/an21p/volatility-surface-azure">an21p/volatility-surface-azure</a></span>
   </footer>
