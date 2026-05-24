@@ -18,6 +18,9 @@ an implied-volatility surface page. See `README.md` for full details.
 
 - `/api/volatility-surface?ticker=TSLA&date=YYYY-MM-DD` → styled HTML surface.
 - `/api/option-data?ticker=SPY` → filtered options JSON.
+- `/api/surface-analysis?ticker=&date=` → JSON `{analysis, cached}`; gpt-4o-mini
+  explains the surface, blob-cached per ticker+date; key from `OPEN_AI_API`
+  (Azure app setting in prod, `.env` locally).
 
 ## Local dev
 

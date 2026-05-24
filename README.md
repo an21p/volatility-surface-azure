@@ -26,6 +26,7 @@ Base URL (production): `https://volsurface.azurewebsites.net`
 | --- | --- | --- |
 | `/api/volatility-surface` | Styled HTML surface page | `?ticker=TSLA&date=2026-05-24` |
 | `/api/option-data` | Filtered options data (JSON) | `?ticker=SPY` |
+| `/api/surface-analysis` | AI explanation of the surface (JSON) | `?ticker=TSLA` |
 
 Both accept `ticker` (default `SPY`) and `date` (`YYYY-MM-DD`, default today).
 
@@ -160,8 +161,9 @@ az login                                       # account needs Contributor on th
 func azure functionapp publish volsurface --build remote --python
 ```
 
-App settings (storage connection strings, App Insights) are configured on the
-app and are **not** stored in this repo.
+App settings (storage connection strings, App Insights, and `OPEN_AI_API` for
+the AI analysis feature) are configured on the app and are **not** stored in
+this repo. Locally, `OPEN_AI_API` is read from `.env` (see `.env.example`).
 
 ### Notes / gotchas
 

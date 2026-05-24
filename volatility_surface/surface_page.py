@@ -333,6 +333,18 @@ main{flex:1;display:grid;grid-template-columns:minmax(290px,360px) 1fr;
   font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
 .panel-bar .hint{color:var(--dim);display:flex;align-items:center;gap:7px}
 .panel-bar .hint svg{opacity:.6}
+.ai-note{display:flex;gap:13px;align-items:flex-start;padding:15px 20px;
+  border-bottom:1px solid var(--line);background:rgba(141,155,232,.04)}
+.ai-note.hide{display:none}
+.ai-badge{flex:none;display:inline-flex;align-items:center;gap:6px;margin-top:1px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--peri)}
+.ai-badge svg{width:12px;height:12px}
+.ai-text{font-size:13px;line-height:1.55;color:var(--muted)}
+.ai-text b{color:var(--text);font-weight:600}
+.ai-note.loading .ai-text{color:var(--dim);font-style:italic}
+@keyframes aipulse{0%,100%{opacity:.4}50%{opacity:.9}}
+.ai-note.loading .ai-text{animation:aipulse 1.4s ease-in-out infinite}
 .plot-wrap{position:relative;flex:1;min-height:440px}
 .plot-wrap > div{position:absolute;inset:0}
 #figure-data{display:none}
@@ -467,6 +479,14 @@ $ticker_options
             <path d="M12 3v3m0 12v3M3 12h3m12 0h3" stroke-linecap="round"/><circle cx="12" cy="12" r="4"/></svg>
           Drag to rotate · scroll to zoom</span>
       </div>
+      <div class="ai-note loading hide" id="ai-note">
+        <span class="ai-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 3l1.8 4.7L18 9l-4.2 1.3L12 15l-1.8-4.7L6 9l4.2-1.3z" stroke-linejoin="round"/>
+          </svg>AI generated
+        </span>
+        <span class="ai-text" id="ai-text">Analyzing surface</span>
+      </div>
       <div class="plot-wrap">
         <div id="surface"></div>
         <div class="plot-skel" id="plot-skel">
@@ -577,6 +597,25 @@ $ticker_options
   }
   if('requestIdleCallback' in window){ requestIdleCallback(load, {timeout:1400}); }
   else { setTimeout(load, 200); }
+})();
+
+// Fetch the AI analysis after load; reveal the note or leave it hidden.
+(function(){
+  var note = document.getElementById('ai-note'),
+      out = document.getElementById('ai-text');
+  if(!note || !out) return;
+  var params = new URLSearchParams(window.location.search);
+  var ticker = (params.get('ticker') || '$ticker'),
+      date = (params.get('date') || '$date');
+  note.classList.remove('hide');               // show loading state
+  fetch('/api/surface-analysis?ticker=' + encodeURIComponent(ticker) +
+        '&date=' + encodeURIComponent(date))
+    .then(function(r){ return r.ok ? r.json() : {analysis:null}; })
+    .then(function(d){
+      if(d && d.analysis){ out.textContent = d.analysis; note.classList.remove('loading'); }
+      else { note.classList.add('hide'); }
+    })
+    .catch(function(){ note.classList.add('hide'); });
 })();
 </script>
 </body>
