@@ -119,6 +119,21 @@ def data_frame_from_blob(container_client, blob_name: str) -> pd.DataFrame:
     return df
 
 
+def get_analysis_blob_name(ticker: str, date: datetime) -> str:
+    return f"{ticker}_analysis_{date.strftime('%Y%m%d')}.txt"
+
+
+def read_text_blob(container_client, blob_name: str) -> str:
+    blob_data = container_client.get_blob_client(
+        blob_name).download_blob().readall()
+    return blob_data.decode("utf-8")
+
+
+def write_text_blob(container_client, blob_name: str, text: str) -> None:
+    container_client.get_blob_client(blob_name).upload_blob(
+        text.encode("utf-8"), overwrite=True)
+
+
 def upload_filtered_options(ticker: str,
                             container_client,
                             raw_options: Optional[pd.DataFrame],
