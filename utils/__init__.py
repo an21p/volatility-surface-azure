@@ -11,6 +11,12 @@ from typing import Optional
 
 import pandas as pd
 
+# Strike filter: keep an OTM blend across a wide moneyness band (mirrors the
+# surface's rendered window) so the SVI smile wings are well-constrained.
+MONEYNESS_LO = 0.70
+MONEYNESS_HI = 1.30
+MAX_STRIKES_PER_EXPIRY = 40
+
 
 def get_filtered_blob_name(ticker: str, date: datetime) -> str:
     return f"{ticker}_filtered_options_{date.strftime('%Y%m%d')}.csv"
@@ -153,22 +159,30 @@ def upload_filtered_options(ticker: str,
     third_fridays = sorted(
         {dt for dt in distinct_expiries if is_third_friday(dt)})
 
-    # 4. Pick the NEXT third‐Friday (>= today)
+    # 4. Keep every upcoming standard (third-Friday) expiry — these give the
+    #    term-structure pillars for the surface.
     today = pd.Timestamp.today().normalize()
     future_std = [dt for dt in third_fridays if dt >= today]
     if not future_std:
         error("No upcoming standard expiry found.")
         return None
 
-    # 5. Filter the DataFrame to only that expiration
-    df_next_monthly = df[df["expiry"].isin(future_std)]
-    df_next_monthly = df_next_monthly[df_next_monthly["type"] == "C"]
-    df_next_monthly["atm_diff"] = (
-        df_next_monthly["strike"] - df_next_monthly['spot']).abs()
+    df_std = df[df["expiry"].isin(future_std)].copy()
 
-    # 6. Pick the 10 strikes nearest ATM
-    df_near_atm = df_next_monthly.sort_values("atm_diff").groupby(
-        "expiry").head(10).sort_values("expiry")
+    # 5. OTM blend within a moneyness band: puts below spot, calls at/above spot.
+    #    OTM quotes have the tightest spreads (cleanest IV for the SVI fit); the
+    #    wide band gives the smile real wing data instead of a narrow ATM cluster.
+    band = (df_std["strike"] >= MONEYNESS_LO * df_std["spot"]) & \
+           (df_std["strike"] <= MONEYNESS_HI * df_std["spot"])
+    otm = ((df_std["strike"] >= df_std["spot"]) & (df_std["type"] == "C")) | \
+          ((df_std["strike"] < df_std["spot"]) & (df_std["type"] == "P"))
+    df_band = df_std[band & otm].copy()
+    df_band["atm_diff"] = (df_band["strike"] - df_band["spot"]).abs()
+
+    # 6. Cap per-expiry width (nearest-ATM first) so the payload stays bounded.
+    df_near_atm = (df_band.sort_values("atm_diff")
+                   .groupby("expiry").head(MAX_STRIKES_PER_EXPIRY)
+                   .sort_values(["expiry", "strike"]))
 
     # 7. Save to CSV
     cols = ["expiry", "spot", "strike", "bid", "ask", "iv", "type"]
