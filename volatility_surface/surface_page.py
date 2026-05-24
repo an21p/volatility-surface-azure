@@ -336,7 +336,7 @@ main{flex:1;display:grid;grid-template-columns:minmax(290px,360px) 1fr;
 .ai-note{display:flex;flex-direction:column;gap:9px;padding:13px 20px 15px;
   border-bottom:1px solid var(--line);background:rgba(141,155,232,.04)}
 .ai-note.hide{display:none}
-.ai-badge{align-self:flex-end;display:inline-flex;align-items:center;gap:6px;
+.ai-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;
   font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--peri);background:rgba(141,155,232,.12);
   border:1px solid rgba(141,155,232,.32);border-radius:999px;padding:4px 10px}
