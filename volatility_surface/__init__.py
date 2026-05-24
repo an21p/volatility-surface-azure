@@ -1,12 +1,16 @@
 import azure.functions as func
+import json
 import logging
 import utils
+import numpy as np
 import pandas as pd
 
 from datetime import datetime
 from typing import Optional
 from visualiser import build_surface
 from volatility_surface.surface_page import render_surface_html
+from volatility_surface.surface_page import compute_stats
+from volatility_surface.analysis import coarse_grid, analyse_surface
 
 
 option_data = func.Blueprint()
@@ -127,3 +131,55 @@ def render(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         mimetype="text/html"
     )
+
+
+analysis = func.Blueprint()
+
+
+@analysis.function_name(name="SurfaceAnalysisTrigger")
+@analysis.route(route="surface-analysis", auth_level=func.AuthLevel.ANONYMOUS)
+def get_surface_analysis(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('surface_analysis: start')
+
+    ticker = req.params.get('ticker', 'SPY').strip().upper()
+    date_str = req.params.get(
+        'date', datetime.strftime(datetime.now(), '%Y-%m-%d'))
+    try:
+        date = datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        return func.HttpResponse("Invalid date format. Please use YYYY-MM-DD.",
+                                 status_code=400)
+
+    container = utils.setup_blob_container()
+    blob_name = utils.get_analysis_blob_name(ticker, date)
+
+    # Cache hit -> return immediately, no model call.
+    if container is not None and utils.blob_exists(container, blob_name):
+        cached = utils.read_text_blob(container, blob_name)
+        return func.HttpResponse(
+            json.dumps({"analysis": cached, "cached": True}),
+            mimetype="application/json")
+
+    # Cache miss -> build the surface, derive stats + grid, ask the model.
+    try:
+        df = get_option_data(ticker, date)
+        spot = float(df['spot'].iloc[0]) if 'spot' in df.columns and not df.empty else None
+        strikes, tenors, vol_surface = build_surface(df, ticker)
+        if spot is None:
+            spot = float(np.mean(strikes)) if len(strikes) else 0.0
+        stats = compute_stats(strikes, tenors, vol_surface, spot)
+        grid = coarse_grid(strikes, tenors, vol_surface)
+        text = analyse_surface(ticker, date_str, stats, grid)
+    except Exception:
+        logging.exception("surface_analysis: failed to build analysis")
+        text = None
+
+    if text and container is not None:
+        try:
+            utils.write_text_blob(container, blob_name, text)
+        except Exception:
+            logging.exception("surface_analysis: failed to cache analysis")
+
+    return func.HttpResponse(
+        json.dumps({"analysis": text, "cached": False}),
+        mimetype="application/json")
