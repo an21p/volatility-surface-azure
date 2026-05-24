@@ -7,11 +7,11 @@ the CBOE JSON endpoint, and renders an interactive implied-volatility surface.
 
 - **Scheduled data download** — a timer trigger periodically fetches and stores
   options data for selected tickers from the CBOE API.
-- **Data filtering** — extracts near-the-money call options for the next
-  standard (third-Friday) expiry.
+- **Data filtering** — extracts an out-of-the-money option blend across a wide
+  moneyness band for every upcoming standard (third-Friday) expiry.
 - **HTTP API** — returns filtered options data (JSON) for a ticker and date.
 - **Rendered surface page** — an HTTP endpoint returns a styled, self-contained
-  HTML page: a QuantLib Black-variance surface drawn with Plotly, wrapped in a
+  HTML page: a calibrated SSVI surface drawn with Plotly, wrapped in a
   dark "instrument readout" (derived stats, ticker/date form). The 3D renderer
   is **lazy-loaded** — the page and stats paint immediately while Plotly.js is
   fetched on idle and drawn into a skeleton placeholder.
@@ -60,12 +60,18 @@ Two things to read off the shape:
 
 ### How it's built
 
-1. For each near-the-money option, solve the **implied volatility** from the
-   bid/ask **mid** price with a Black–Scholes–Merton model (QuantLib), assuming
-   flat `r = 3%` and `q = 1%`.
-2. Fit those points into a QuantLib **`BlackVarianceSurface`**, filling gaps and
-   interpolating.
-3. Sample it on a fine grid of strikes × tenors to draw.
+1. Take an **out-of-the-money blend** across a wide moneyness band (~70–130% of
+   spot) for every upcoming standard (third-Friday) expiry — puts below spot,
+   calls above — since OTM quotes have the tightest spreads and cleanest IV.
+2. For each option, solve the **implied volatility** from the bid/ask **mid**
+   price with a Black–Scholes–Merton model (QuantLib), assuming flat `r = 3%`
+   and `q = 1%`.
+3. Calibrate an **SSVI** (surface SVI) model to the resulting points: a per-expiry
+   ATM total variance plus three global parameters. SSVI gives a genuinely smooth
+   smile and is calendar-arbitrage-free by construction (with a butterfly-arbitrage
+   safeguard). If calibration fails it falls back to a QuantLib
+   `BlackVarianceSurface`.
+4. Evaluate the model on a fixed moneyness × tenor grid to draw.
 
 The readout panel summarises the surface: **Spot**, **ATM IV** (at-the-money,
 ~1-month), **Skew**, **Term**, the **IV range** (min–max across the grid), the
@@ -121,6 +127,14 @@ uv venv .preview-venv && uv pip install --python .preview-venv/bin/python plotly
 
 # live server with a ticker/date form (synthetic, per-ticker surfaces):
 .preview-venv/bin/python scripts/serve_preview.py --port 8050   # http://localhost:8050
+```
+
+To preview the **real** SSVI pipeline (not synthetic) you need QuantLib + scipy,
+so use a full env and point `--data` at an option chain:
+
+```bash
+python scripts/make_sample_chain.py                              # regenerate fixture
+python scripts/serve_preview.py --data tests/fixtures/options_sample.csv --port 8050
 ```
 
 ## Deployment

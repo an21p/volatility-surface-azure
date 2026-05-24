@@ -1,11 +1,16 @@
 """Local preview server for the volatility-surface page.
 
-Serves the SAME page the Azure endpoint renders, but backed by a synthetic
-surface (deterministic per ticker) so you can test the design and the
+Serves the SAME page the Azure endpoint renders. By default it's backed by a
+synthetic surface (deterministic per ticker) so you can test the design and the
 ticker/date form without Azure Storage, CBOE, or QuantLib.
 
     python scripts/serve_preview.py            # -> http://localhost:8000
     python scripts/serve_preview.py --port 9000
+
+Pass --data <chain.csv> to render the REAL pipeline (build_surface + SSVI) on an
+option chain instead. That path needs QuantLib + scipy (e.g. the .devvenv):
+
+    .devvenv/bin/python scripts/serve_preview.py --data tests/fixtures/options_sample.csv
 
 Routes: "/" and "/api/volatility-surface" both accept ?ticker= & ?date=.
 """
@@ -48,7 +53,29 @@ def synthetic_surface(ticker: str, n_strikes=21, n_tenors=50):
     return strikes, tenors, np.clip(vol, 0.05, 1.6), spot
 
 
+_REAL_CACHE = {}
+
+
+def real_surface(data_path: str):
+    """Run the actual build_surface (QuantLib + SSVI) on an option-chain CSV.
+
+    Cached so the page reloads quickly; the surface is the same regardless of
+    the ?ticker= query (which only sets the page title)."""
+    if "v" not in _REAL_CACHE:
+        import pandas as pd
+        import sys
+        sys.path.insert(0, _HERE)
+        import visualiser
+        df = pd.read_csv(data_path)
+        strikes, tenors, vol = visualiser.build_surface(df)
+        _REAL_CACHE["v"] = (strikes, tenors, vol, float(df["spot"].iloc[0]))
+    return _REAL_CACHE["v"]
+
+
 class Handler(BaseHTTPRequestHandler):
+    data_path = None  # set by main() when --data is given
+
+
     def log_message(self, fmt, *args):
         print(f"  {self.address_string()} - {fmt % args}")
 
@@ -81,7 +108,10 @@ class Handler(BaseHTTPRequestHandler):
         ticker = qs.get("ticker", ["SPY"])[0].strip().upper() or "SPY"
         date_str = qs.get("date", [_date.today().isoformat()])[0]
 
-        strikes, tenors, vol, spot = synthetic_surface(ticker)
+        if self.data_path:
+            strikes, tenors, vol, spot = real_surface(self.data_path)
+        else:
+            strikes, tenors, vol, spot = synthetic_surface(ticker)
         html = _sp.render_surface_html(ticker, date_str, strikes, tenors, vol, spot)
         body = html.encode("utf-8")
 
@@ -96,13 +126,19 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--data", default=None,
+                   help="option-chain CSV to render via the real build_surface "
+                        "(needs QuantLib + scipy)")
     a = p.parse_args()
+
+    Handler.data_path = a.data
 
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
     url = f"http://{a.host}:{a.port}/"
+    src = f"real pipeline · {a.data}" if a.data else "synthetic data"
     print(f"\n  Volatility surface preview  →  {url}")
     print(f"  Try: {url}?ticker=NVDA   ·   {url}?ticker=AAPL&date=2026-05-24")
-    print("  (synthetic data · Ctrl-C to stop)\n")
+    print(f"  ({src} · Ctrl-C to stop)\n")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

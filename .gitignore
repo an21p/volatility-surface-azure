@@ -139,3 +139,4 @@ __azurite_db*__.json
 # local preview artifacts
 preview.html
 .preview-venv/
+.devvenv/

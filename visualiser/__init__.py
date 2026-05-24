@@ -1,10 +1,21 @@
 import argparse
-import requests
+from logging import info
 import pandas as pd
 import numpy as np
 import QuantLib as ql
 from datetime import date
-import matplotlib.pyplot as plt
+
+from visualiser import ssvi
+
+# `requests` and `matplotlib` are only used by the optional CLI preview (`run`),
+# so they're imported lazily there — the Azure serving path and the unit tests
+# don't need them.
+
+# Rendered surface covers a fixed moneyness window so every ticker looks
+# consistent and the SVI smile wings are always shown.
+MONEYNESS_LO = 0.70
+MONEYNESS_HI = 1.30
+N_STRIKE_GRID = 60
 
 
 def implied_vol_mid(option, bid, ask, bsm_process, tol=1e-6, max_eval=100, vol_min=1e-4, vol_max=5.0):
@@ -106,19 +117,61 @@ def build_surface(data: pd.DataFrame, ticker: str = "SPY") -> tuple:
             else:
                 vol_matrix[i, j] = np.nan
 
-    # Handle missing vols via forward/backward fill
+    # ─────────────── CALIBRATE SSVI (smooth, arbitrage-aware surface)
+    # Build per-expiry (tenor, log-moneyness, total-variance) point sets from the
+    # solved IVs, skipping strikes where the solver failed. Forward is
+    # F_t = spot * exp((r - q) * t); total variance is w = iv**2 * t.
+    day_counter = ql.Actual365Fixed()
+    slices = []
+    for i, ql_exp in enumerate(ql_expiries):
+        t = day_counter.yearFraction(ql_today, ql_exp)
+        if t <= 0:
+            continue
+        fwd = spot * np.exp((risk_free_rate - dividend_yield) * t)
+        ks, ws = [], []
+        for j, K in enumerate(unique_strikes):
+            iv = vol_matrix[i, j]
+            if np.isfinite(iv) and iv > 0:
+                ks.append(np.log(K / fwd))
+                ws.append(iv * iv * t)
+        if ks:
+            slices.append((t, np.asarray(ks), np.asarray(ws)))
+
+    try:
+        params = ssvi.calibrate_ssvi(slices)
+        t_min = min(s[0] for s in slices)
+        t_max = max(s[0] for s in slices)
+        tenors = list(np.linspace(t_min, t_max, n_points))
+        strikes_grid = list(spot * np.linspace(MONEYNESS_LO, MONEYNESS_HI,
+                                                N_STRIKE_GRID))
+        vol_surface = ssvi.evaluate_surface(
+            params, strikes_grid, tenors, spot, risk_free_rate, dividend_yield)
+        return strikes_grid, tenors, vol_surface
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        info("SSVI calibration failed (%s); using BlackVarianceSurface.", exc)
+        return _blackvariance_surface(
+            ql_today, ql_calendar, ql_expiries, unique_strikes,
+            vol_matrix, n_points)
+
+
+def _blackvariance_surface(ql_today, ql_calendar, ql_expiries, unique_strikes,
+                           vol_matrix, n_points):
+    """Fallback surface using QuantLib's bilinear BlackVarianceSurface.
+
+    Used only if SSVI calibration fails. Gap-fills the IV matrix (forward,
+    backward, then median) and samples on the observed strikes x an even tenor
+    grid — the project's original behaviour.
+    """
+    n_exp, n_strk = vol_matrix.shape
     for i in range(n_exp):
         row = vol_matrix[i, :]
         if np.isnan(row).any():
-            # Forward fill
             for j in range(1, n_strk):
                 if np.isnan(row[j]) and not np.isnan(row[j - 1]):
                     row[j] = row[j - 1]
-            # Backward fill
             for j in range(n_strk - 2, -1, -1):
                 if np.isnan(row[j]) and not np.isnan(row[j + 1]):
                     row[j] = row[j + 1]
-            # Fill remaining with median
             row[np.isnan(row)] = np.nanmedian(vol_matrix)
             vol_matrix[i, :] = row
 
@@ -127,27 +180,17 @@ def build_surface(data: pd.DataFrame, ticker: str = "SPY") -> tuple:
         for j in range(n_strk):
             volMatrix[j][i] = vol_matrix[i, j]
 
-    # ─────────────── BUILD BLACK VARIANCE SURFACE
-    expiry_day_counter = ql.Actual365Fixed()
-
+    day_counter = ql.Actual365Fixed()
     black_var_surface = ql.BlackVarianceSurface(
-        ql_today,
-        ql_calendar,
-        ql_expiries,
-        unique_strikes,
-        volMatrix,
-        expiry_day_counter
-    )
+        ql_today, ql_calendar, ql_expiries, unique_strikes, volMatrix,
+        day_counter)
     black_var_handle = ql.BlackVolTermStructureHandle(black_var_surface)
 
-    # Generate 30 evenly spaced expiry dates between ql_today and the last unique_expiry
-    last_expiry = unique_expiries[-1]
-    date_range = [ql_today + int(i * (ql.Date(last_expiry.day, last_expiry.month,
-                                 last_expiry.year) - ql_today) / (n_points - 1)) for i in range(n_points)]
-    expiry_periods = [expiry_day_counter.yearFraction(
-        ql_today, d) for d in date_range]
+    last_expiry = ql_expiries[-1]
+    date_range = [ql_today + int(i * (last_expiry - ql_today) / (n_points - 1))
+                  for i in range(n_points)]
+    expiry_periods = [day_counter.yearFraction(ql_today, d) for d in date_range]
 
-    # Select a few expiries to visualize
     vol_surface = np.zeros((len(expiry_periods), len(unique_strikes)))
     for i, t in enumerate(expiry_periods):
         for j, k in enumerate(unique_strikes):
@@ -157,6 +200,9 @@ def build_surface(data: pd.DataFrame, ticker: str = "SPY") -> tuple:
 
 
 def run(ticker: str = "SPY") -> None:
+    import requests
+    import matplotlib.pyplot as plt
+
     data = requests.get(
         f"https://volsurface.azurewebsites.net/api/option-data?ticker={ticker}")
     # data = requests.get(f"http://localhost:7071/api/option-data?ticker={ticker}")
