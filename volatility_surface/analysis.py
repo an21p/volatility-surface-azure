@@ -35,3 +35,33 @@ def coarse_grid(strikes, tenors, vol_surface, n: int = 5) -> dict:
         "tenors": [round(float(t), 3) for t in tenors[ti]],
         "iv": [[round(float(Z[i, j]), 2) for j in si] for i in ti],
     }
+
+
+SYSTEM_PROMPT = (
+    "You are a quantitative analyst. Given summary statistics and a coarse grid "
+    "of an equity option implied-volatility surface, write a concise, plain-English "
+    "explanation of what it shows: the overall volatility level, the skew across "
+    "strikes, the term structure across expiries, and any notable feature. Write 2 "
+    "to 3 sentences, about 60 words. Be specific and use percentages. Do not give "
+    "financial advice. Do not use dashes of any kind; write in plain sentences."
+)
+
+
+def build_prompt(ticker: str, date_str: str, stats: dict, grid: dict) -> list:
+    payload = {
+        "ticker": ticker,
+        "as_of": date_str,
+        "spot": round(stats["spot"], 2),
+        "atm_iv_pct": round(stats["atm_iv"], 1),
+        "skew_90_110_pts": round(stats["skew"], 1),
+        "term_front_to_back_pts": round(stats["term"], 1),
+        "iv_low_pct": round(stats["iv_lo"], 1),
+        "iv_high_pct": round(stats["iv_hi"], 1),
+        "tenor_span_years": round(stats["tenor_span"], 2),
+        "n_strikes": stats["n_strikes"],
+        "coarse_iv_grid": grid,
+    }
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": json.dumps(payload)},
+    ]
