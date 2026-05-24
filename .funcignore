@@ -6,4 +6,8 @@ __queuestorage__
 local.settings.json
 test
 .venv
+.preview-venv
 .functions
+scripts
+preview.html
+preview-shot*.png
