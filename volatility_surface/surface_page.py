@@ -6,6 +6,7 @@ has been restyled to match the page (custom plasma colorscale, transparent
 canvas, monospace axes). See ``render`` in ``__init__`` for the entry point.
 """
 
+import html
 from string import Template
 from typing import Optional
 
@@ -40,6 +41,41 @@ _AXIS = dict(
     title_font=dict(family="IBM Plex Mono, monospace", size=11, color="#9aa0ad"),
     tickfont=dict(family="IBM Plex Mono, monospace", size=10, color="#6b7080"),
 )
+
+# Curated popular, liquid optionable symbols for the page's ticker dropdown.
+# The engine can fetch any CBOE-listed symbol on demand; this is a grouped
+# convenience list (50 names) for the <select>.
+POPULAR_TICKERS = [
+    ("Index ETFs", ["SPY", "QQQ", "IWM", "DIA"]),
+    ("Technology", ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA",
+                    "AMD", "NFLX", "INTC", "ADBE", "CRM", "ORCL", "CSCO",
+                    "AVGO", "QCOM", "TXN", "MU", "IBM"]),
+    ("Financials", ["JPM", "BAC", "GS", "MS", "WFC", "V", "MA", "AXP"]),
+    ("Consumer", ["WMT", "COST", "HD", "MCD", "NKE", "SBUX", "DIS", "KO", "PEP"]),
+    ("Healthcare", ["JNJ", "UNH", "PFE", "MRK", "ABBV"]),
+    ("Energy & Industrial", ["XOM", "CVX", "BA", "CAT", "F"]),
+]
+
+
+def _ticker_options(current: str) -> str:
+    """Build the grouped <option> markup, marking ``current`` as selected.
+
+    A requested ticker outside the curated list is surfaced at the top so the
+    dropdown still reflects what is actually displayed.
+    """
+    current = (current or "").upper()
+    known = {t for _, tickers in POPULAR_TICKERS for t in tickers}
+    parts = []
+    if current and current not in known:
+        safe = html.escape(current, quote=True)
+        parts.append(f'<option value="{safe}" selected>{safe} · custom</option>')
+    for group, tickers in POPULAR_TICKERS:
+        parts.append(f'<optgroup label="{group}">')
+        for t in tickers:
+            sel = " selected" if t == current else ""
+            parts.append(f'<option value="{t}"{sel}>{t}</option>')
+        parts.append("</optgroup>")
+    return "\n".join(parts)
 
 
 def build_figure(strikes, tenors, vol_surface) -> go.Figure:
@@ -234,14 +270,21 @@ header{display:flex;align-items:flex-start;justify-content:space-between;gap:24p
 form.query{display:flex;align-items:stretch;gap:8px;font-family:var(--mono)}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:9.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--dim);padding-left:2px}
-.field input{
+.field input,.field select{
   font-family:var(--mono);font-size:13px;color:var(--text);
   background:var(--ink-2);border:1px solid var(--line);border-radius:9px;
   padding:9px 12px;outline:none;transition:border-color .2s,box-shadow .2s;
 }
-.field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
-.field.tk input{width:118px;text-transform:uppercase;letter-spacing:.12em;font-weight:500}
+.field input:focus,.field select:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.field.tk input,.field.tk select{width:148px;text-transform:uppercase;letter-spacing:.08em;font-weight:500}
 .field.dt input{width:160px;color-scheme:dark}
+.field select{
+  appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:32px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23f3b13e' stroke-width='2'%3E%3Cpath d='M2 4.5l4 4 4-4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;
+}
+.field select option,.field select optgroup{background:var(--ink-2);color:var(--text)}
+.field select optgroup{color:var(--muted);font-weight:600;font-style:normal}
 .go{align-self:flex-end;font-family:var(--mono);font-size:12px;letter-spacing:.12em;
   text-transform:uppercase;color:#0a0c11;background:var(--gold);border:none;cursor:pointer;
   border-radius:9px;padding:10px 18px;font-weight:600;transition:transform .15s,filter .2s}
@@ -353,7 +396,9 @@ $delays
     <form class="query" method="get" action="">
       <div class="field tk">
         <label for="t">Ticker</label>
-        <input id="t" name="ticker" value="$ticker" autocomplete="off" spellcheck="false">
+        <select id="t" name="ticker" onchange="this.form.submit()">
+$ticker_options
+        </select>
       </div>
       <div class="field dt">
         <label for="d">As of</label>
@@ -488,6 +533,7 @@ def render_page(ticker: str, date_str: str, figure_json: str, stats: dict) -> st
     return _PAGE.safe_substitute(
         ticker=ticker,
         date=date_str,
+        ticker_options=_ticker_options(ticker),
         figure_json=figure_json,
         plotly_cdn=PLOTLY_CDN,
         delays="",  # reserved hook; per-element delays set inline via --d
