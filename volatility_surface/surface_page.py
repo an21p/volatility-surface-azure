@@ -547,7 +547,7 @@ $ticker_options
 
   <footer class="rise" style="--d:.46s">
     <span>Source · CBOE delayed options · rendered $date</span>
-    <span>Azure Functions · <a href="https://github.com/an21p/volatility-surface-azure">an21p/volatility-surface-azure</a></span>
+    <span>Azure Functions · <a href="https://github.com/an21p/volatility-surface-azure">an21p/volatility-surface-azure</a> · <a href="https://an21p.github.io/">Antonis Pishias ↗</a></span>
   </footer>
 </div>
 
